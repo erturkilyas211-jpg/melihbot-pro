@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MelihBot AI</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <style>
+        /* --- MODERN & DARK UI TASARIMI --- */
+        :root {
+            --bg-dark: #343541;
+            --sidebar-dark: #202123;
+            --input-area: #40414f;
+            --user-msg: #343541;
+            --ai-msg: #444654;
+            --text-primary: #ececf1;
+            --border-color: #565869;
+            --accent: #10a37f;
+        }
+
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background-color: var(--bg-dark); color: var(--text-primary); display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Sidebar */
+        #sidebar { width: 260px; background-color: var(--sidebar-dark); padding: 10px; display: flex; flex-direction: column; transition: 0.3s; border-right: 1px solid #333; }
+        .logo { padding: 10px; font-size: 20px; font-weight: bold; color: white; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #444; margin-bottom: 20px; }
+        
+        .mode-btn { background: transparent; border: 1px solid #444; color: white; padding: 12px; margin-bottom: 8px; border-radius: 6px; cursor: pointer; text-align: left; font-size: 14px; transition: 0.2s; display: flex; align-items: center; gap: 10px; }
+        .mode-btn:hover { background: #2a2b32; }
+        .mode-btn.active { background: #343541; border-color: var(--accent); color: var(--accent); }
+
+        #clear-chat { margin-top: auto; background: transparent; border: 1px solid #d32f2f; color: #d32f2f; }
+        #clear-chat:hover { background: #d32f2f; color: white; }
+
+        /* Ana Sohbet Alanı */
+        #main { flex: 1; display: flex; flex-direction: column; position: relative; }
+        #chat-container { flex: 1; overflow-y: auto; padding-bottom: 120px; scroll-behavior: smooth; }
+        
+        /* Mesaj Stilleri */
+        .message-row { display: flex; padding: 24px 0; border-bottom: 1px solid rgba(0,0,0,0.1); }
+        .message-row.ai { background-color: var(--ai-msg); }
+        .message-row.user { background-color: var(--user-msg); }
+        
+        .message-content { max-width: 800px; margin: 0 auto; display: flex; gap: 20px; width: 90%; }
+        .avatar { width: 30px; height: 30px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
+        .user .avatar { background: #5436DA; } /* Kullanıcı Rengi */
+        .ai .avatar { background: var(--accent); } /* Bot Rengi */
+        
+        .text { line-height: 1.6; font-size: 16px; overflow-x: auto; width: 100%; }
+        
+        /* Kod Blokları Düzenlemesi */
+        pre { background: #000 !important; padding: 15px; border-radius: 6px; overflow-x: auto; border: 1px solid #555; }
+        code { font-family: 'Consolas', monospace; }
+
+        /* Input Alanı */
+        #input-area { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(180deg, rgba(53,53,65,0), var(--bg-dark) 20%); padding: 30px; display: flex; justify-content: center; }
+        .input-box { background: var(--input-area); border: 1px solid rgba(0,0,0,0.2); border-radius: 12px; padding: 12px 16px; width: 100%; max-width: 768px; display: flex; box-shadow: 0 0 15px rgba(0,0,0,0.2); }
+        textarea { background: transparent; border: none; color: white; width: 100%; resize: none; height: 24px; max-height: 200px; outline: none; font-size: 16px; font-family: inherit; }
+        #send-btn { background: transparent; border: none; color: var(--accent); cursor: pointer; padding: 5px; margin-left: 10px; }
+        #send-btn:disabled { color: #666; cursor: default; }
+
+        /* Mobil Uyum */
+        @media (max-width: 768px) {
+            #sidebar { display: none; position: absolute; height: 100%; z-index: 10; }
+            #sidebar.open { display: flex; }
+            .mobile-menu-btn { display: block; position: fixed; top: 10px; left: 10px; z-index: 20; background: #333; color: white; border: none; padding: 10px; border-radius: 4px; }
+        }
+        @media (min-width: 769px) { .mobile-menu-btn { display: none; } }
+    </style>
+</head>
+<body>
+
+    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+    <div id="sidebar">
+        <div class="logo">🤖 MelihBot <span style="font-size:10px; background:#444; padding:2px 5px; border-radius:4px;">PRO</span></div>
+        
+        <div style="font-size:12px; color:#888; margin-bottom:10px; padding-left:5px;">YAPAY ZEKA MODU</div>
+        <button class="mode-btn active" onclick="setMode('assistant', this)">🧠 Genel Asistan</button>
+        <button class="mode-btn" onclick="setMode('coder', this)">💻 Senior Yazılımcı</button>
+        <button class="mode-btn" onclick="setMode('creative', this)">🎨 Yaratıcı Yazar</button>
+        <button class="mode-btn" onclick="setMode('troll', this)">🤪 Troll & Komik</button>
+
+        <button id="clear-chat" class="mode-btn" onclick="clearHistory()">🗑️ Sohbeti Temizle</button>
+    </div>
+
+    <div id="main">
+        <div id="chat-container"></div>
+
+        <div id="input-area">
+            <div class="input-box">
+                <textarea id="chat-input" placeholder="MelihBot'a bir şey sor..." rows="1" oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+                <button id="send-btn" onclick="sendMessage()"><svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="20" width="20"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
+            </div>
+            <div style="position: absolute; bottom: 5px; font-size: 11px; color: #666;">MelihBot Free Research Preview. Powered by Google Gemini.</div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api/chat';
+        let chatHistory = [];
+        let currentMode = 'assistant';
+
+        // Markdown Ayarları (Profesyonel Görünüm için)
+        marked.setOptions({
+            highlight: function(code, lang) {
+                const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                return hljs.highlight(code, { language }).value;
+            },
+            breaks: true
+        });
+
+        // Sayfa Yüklendiğinde
+        window.onload = () => {
+            const stored = localStorage.getItem('melihbot_history');
+            if (stored) {
+                chatHistory = JSON.parse(stored);
+                chatHistory.forEach(msg => appendMessageToUI(msg.role, msg.text, false));
+            } else {
+                appendMessageToUI('model', 'Merhaba! Ben MelihBot Pro. Bugün sana nasıl yardımcı olabilirim?', false);
+            }
+        };
+
+        function setMode(mode, btn) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            appendMessageToUI('model', `Mod değiştirildi: **${btn.innerText}**. Hazırım!`, false);
+        }
+
+        function appendMessageToUI(role, text, isStream = false) {
+            const container = document.getElementById('chat-container');
+            const row = document.createElement('div');
+            row.className = `message-row ${role === 'user' ? 'user' : 'ai'}`;
+            
+            // Markdown Render işlemi (Bot mesajları için)
+            const contentHtml = role === 'model' ? marked.parse(text) : text;
+
+            row.innerHTML = `
+                <div class="message-content">
+                    <div class="avatar">${role === 'user' ? 'S' : 'MB'}</div>
+                    <div class="text">${contentHtml}</div>
+                </div>
+            `;
+            container.appendChild(row);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            // UI Güncelle
+            appendMessageToUI('user', text);
+            input.value = '';
+            input.style.height = '24px';
+            
+            // Geçmişe Ekle
+            chatHistory.push({ role: 'user', text: text });
+            localStorage.setItem('melihbot_history', JSON.stringify(chatHistory));
+
+            // Butonu kilitle
+            const btn = document.getElementById('send-btn');
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ history: chatHistory, mode: currentMode })
+                });
+
+                const data = await response.json();
+                
+                // Bot Yanıtı
+                chatHistory.push({ role: 'model', text: data.reply });
+                localStorage.setItem('melihbot_history', JSON.stringify(chatHistory));
+                appendMessageToUI('model', data.reply);
+
+            } catch (error) {
+                appendMessageToUI('model', '⚠️ Bir hata oluştu. Lütfen tekrar dene.');
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function clearHistory() {
+            localStorage.removeItem('melihbot_history');
+            chatHistory = [];
+            document.getElementById('chat-container').innerHTML = '';
+            appendMessageToUI('model', 'Sohbet geçmişi temizlendi.');
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+    </script>
+</body>
+</html>
